@@ -18,7 +18,7 @@ impl Request {
 
 		buf_reader.read_line(&mut req_line)?;
 
-		let parts: Vec<_> = req_line.trim_end().split_whitespace().collect();
+		let parts: Vec<_> = req_line.split_whitespace().collect();
 
 		if parts.len() != 3 {
 			return Err(Error::new(ErrorKind::InvalidData, "Invalid request"));
