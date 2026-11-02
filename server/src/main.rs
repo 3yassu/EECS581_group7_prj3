@@ -1,3 +1,6 @@
+mod server;
+use server::init_server;
+
 fn main() {
-    println!("Hello, world!");
+	init_server().expect("failed to start server");
 }
