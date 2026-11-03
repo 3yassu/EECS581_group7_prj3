@@ -5,13 +5,16 @@ use std::{
 		Ipv4Addr,
 		SocketAddrV4
 	},
-	io::Result,
 };
 
 mod request;
 use request::Request;
 mod response;
 use response::Response;
+mod method;
+use method::Method;
+mod error;
+use error::Result;
 
 type BStr = Box<str>;
 

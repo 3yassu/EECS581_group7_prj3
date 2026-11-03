@@ -1,8 +1,8 @@
-use super::{BStr, Request};
+use super::{BStr, Request, error::{Result, Error, ErrorKind}};
 use std::{
 	fs,
 	net::TcpStream,
-	io::{Result, Error, ErrorKind, Write},
+	io::Write,
 	path::{PathBuf, Path},
 };
 
@@ -40,7 +40,7 @@ impl Response {
 			}
 		}
 		if !path.starts_with("../frontend/dist") {
-			return Err(Error::new(ErrorKind::InvalidData, "Not allowed BUDDY. access DENIED"));
+			return Err(Error::new(ErrorKind::PermissionDenied));
 		}
 		
 		if path.is_file() {
@@ -66,6 +66,7 @@ impl Response {
 		}
 		write!(stream, "\r\n")?;
 		stream.write_all(&self.inner)?;
-		stream.flush()
+		stream.flush()?;
+		Ok(())
 	}
 }
