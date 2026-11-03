@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use super::error::{Error, ErrorKind};
 
 #[non_exhaustive]

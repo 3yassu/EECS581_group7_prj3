@@ -3,7 +3,7 @@ use std::{
 	fs,
 	net::TcpStream,
 	io::Write,
-	path::{PathBuf, Path},
+	path::Path,
 };
 
 pub struct Response {
@@ -29,33 +29,15 @@ impl Response {
 	}
 
 	pub fn from_request(request: Request) -> Result<Self>{
-    let mut path = PathBuf::from("../frontend/dist/");
-		let req_path = request.path().trim_start_matches('/');
-		if req_path.is_empty() {
-			path.push("index.html")
-		} else {
-			for d in req_path.split("/") {
-				if d == ".." {path.pop();}
-				else {path.push(d)}
-			}
-		}
-		if !path.starts_with("../frontend/dist") {
-			return Err(Error::new(ErrorKind::PermissionDenied));
-		}
+		let path = request.path();
 		
 		if path.is_file() {
-			let inner = fs::read(&path)?;
-			let headers = vec![("Content-Type".into(), Response::get_type(&path).into())];
-      return Ok(Self {code: 200, text: "OK".into(), headers, inner});
-		} else if path.is_dir() {
-			path.push("index.html");
-			if path.is_file() {
-				let inner = fs::read(&path)?;
-				let headers = vec![("Content-Type".into(), Response::get_type(&path).into())];
-      	return Ok(Self {code: 200, text: "OK".into(), headers, inner});
-			}
+			let inner = fs::read(path)?;
+			let headers = vec![("Content-Type".into(), Response::get_type(path).into())];
+      Ok(Self {code: 200, text: "OK".into(), headers, inner})
+		} else {
+			Ok(Self {code: 404, text: "NOT FOUND".into(), headers: Vec::new(), inner: Vec::new()})
 		}
-    Ok(Self {code: 404, text: "NOT FOUND".into(), headers: Vec::new(), inner: Vec::new()})
 	}
 
 

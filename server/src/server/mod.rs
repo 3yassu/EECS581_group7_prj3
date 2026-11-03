@@ -12,7 +12,6 @@ use request::Request;
 mod response;
 use response::Response;
 mod method;
-use method::Method;
 mod error;
 use error::Result;
 
@@ -33,7 +32,7 @@ pub fn init_server() -> Result<()>{
 }
 
 fn handle_connection(mut stream: TcpStream) -> Result<()>{
-	let request = Request::from_stream(&stream)?;
+	let request = Request::headerless_from_stream(&stream)?;
 	let response = Response::from_request(request)?;
 	response.send(&mut stream)
 }
