@@ -13,12 +13,13 @@ impl Drop for ChromeDriverGuard {
     }
 }
 
-pub async fn run() -> WebDriverResult<()> {
+pub async fn run(driver_version: &str) -> WebDriverResult<()> {
+    let driver_path = format!("./webdrivers/{driver_version}-chromedriver");
     let _chromedriver = ChromeDriverGuard(
-        Command::new("./webdrivers/linux-chromedriver")
+        Command::new(&driver_path)
             .arg("--port=9515")
             .spawn()
-            .expect("Failed to start chromedriver at ./webdrivers/linux-chromedriver"),
+            .unwrap_or_else(|_| panic!("Failed to start chromedriver at {driver_path}")),
     );
 
     let mut caps = DesiredCapabilities::chrome();
