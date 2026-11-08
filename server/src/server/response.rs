@@ -25,15 +25,6 @@ impl Response {
 	        Some("gif") => "image/gif",
   	      Some("svg") => "image/svg+xml",
     	    _ => "application/octet-stream",
-    	}  Some("html") => "text/html",
-	        Some("css") => "text/css",
-	        Some("js") => "application/javascript",
-	        Some("json") => "application/json",
-	        Some("png") => "image/png",
-	        Some("jpg") | Some("jpeg") => "image/jpeg",
-	        Some("gif") => "image/gif",
-  	      Some("svg") => "image/svg+xml",
-    	    _ => "application/octet-stream",
     	}
 	}
 

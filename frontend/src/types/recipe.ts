@@ -26,4 +26,22 @@ export const RECIPES: Recipe[] = [
       { text: 'Bake in the preheated oven until crispy, 15 to 20 minutes.', timerSeconds: 900 },
     ],
   },
+  {
+    title: 'Raisins',
+    sourceUrl: 'https://en.wikipedia.org/wiki/The_California_Raisins',
+    servings: 120,
+    totalTimeMinutes: 0,
+    ingredients: ['120 raisins'],
+    steps: [],
+  },
+  {
+    title: 'Awesome and Easy Creamy Corn Casserole',
+    sourceUrl: 'https://www.allrecipes.com/recipe/18906/awesome-and-easy-creamy-corn-casserole/',
+    servings: 8,
+    totalTimeMinutes: 55,
+    ingredients: ['1 (15 ounce) can whole kernel corn, drained', '1 (14.75 ounce) can creamed corn', '1 (8.5 ounce) package dry cornbread mix', '1 cup sour cream', '1/2 cup butter, melted', '2 large eggs, beaten'],
+    steps: [
+      {text: ' *makes corn casserole like a boss* ' },
+    ],
+  },
 ]

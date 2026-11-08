@@ -1,12 +1,30 @@
-import { createModel, type Model } from "vosk-browser";
+import { Model, type Model as VoskModel } from "vosk-browser";
 
-const MODEL_URL = '/models/vosk-model-small-en-us-0.15';
+const MODEL_URL = '/models/vosk-model-small-en-us-0.15.model';
 
-let modelPromise: Promise<Model> | null = null;
+let modelPromise: Promise<VoskModel> | null = null;
 
 export function loadModel() {
-    if (!modelPromise) modelPromise = createModel(MODEL_URL);
-        return modelPromise;
+  if (!modelPromise) {
+    const model = new Model(MODEL_URL);
+    modelPromise = new Promise<VoskModel>((resolve, reject) => {
+      model.on('load', (message) => {
+        if ('result' in message && message.result) {
+          resolve(model);
+        } else {
+          reject(new Error('Vosk failed to load the speech model.'));
+        }
+      });
+      model.on('error', (message) => {
+        if ('error' in message) reject(new Error(message.error));
+      });
+    }).catch((error: unknown) => {
+      model.terminate();
+      modelPromise = null;
+      throw error;
+    });
+  }
+  return modelPromise;
 }
 
 type Handlers = {
@@ -14,6 +32,9 @@ type Handlers = {
     onFinal?: (text: string) => void;
     grammar?: string[];
 };
+
+type PartialResultMessage = { result: { partial: string } };
+type FinalResultMessage = { result: { text: string } };
 
 export async function startListening({ onPartial, onFinal, grammar }: Handlers) {
   const model = await loadModel();
@@ -30,10 +51,10 @@ export async function startListening({ onPartial, onFinal, grammar }: Handlers) 
   : new model.KaldiRecognizer(audioContext.sampleRate);
 
   recognizer.on('partialresult', (msg) => {
-    onPartial?.((msg as any).result.partial);
+    onPartial?.((msg as PartialResultMessage).result.partial);
   });
   recognizer.on('result', (msg) => {
-    const text = (msg as any).result.text;
+    const text = (msg as FinalResultMessage).result.text;
     if (text) onFinal?.(text);
   });
 
