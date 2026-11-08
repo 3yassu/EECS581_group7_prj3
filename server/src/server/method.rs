@@ -1,6 +1,7 @@
 use super::error::{Error, ErrorKind};
 
 #[non_exhaustive]
+#[derive(Debug)]
 pub enum Method {
 	Get,
 }

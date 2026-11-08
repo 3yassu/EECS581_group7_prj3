@@ -1,16 +1,18 @@
 use std::{
 	io::{BufRead, BufReader},
 	net::TcpStream, path::{Path, PathBuf},
+	collections::HashMap,
 };
 use super::{BStr, method::Method, error::{Error, Result, ErrorKind}};
 
 
-
+#[derive(Debug)]
 pub struct Request {
 	method: Method,
+	headers: HashMap<BStr, BStr>,
 	path: PathBuf,
-	//headers: HashMap<BStr, BStr>
 	vers: BStr
+	// message_body: BStr
 }
 
 impl Request {
@@ -34,13 +36,9 @@ impl Request {
 
 		Ok(path)
 	}
-	pub fn headerless_from_stream(stream: &TcpStream) -> Result<Self>{
-		let mut buf_reader = BufReader::new(stream);
-		let mut req_line = String::new();
-
-		buf_reader.read_line(&mut req_line)
-			.map_err(|_| Error::new(ErrorKind::InvalidRequest))?;
-
+	pub fn from_stream(stream: &TcpStream) -> Result<Self>{
+		let mut lines = BufReader::new(stream).lines();
+		let req_line =  lines.next().ok_or(Error::new(ErrorKind::InvalidRequest))??;
 		let parts: Vec<_> = req_line.split_whitespace().collect();
 
 		if parts.len() != 3 {
@@ -51,8 +49,18 @@ impl Request {
 		let path = Request::build_path(parts[1])?;
 		// Errorchecking for the version
 		let vers = parts[2].into();
-		
-		Ok(Self {method, path, vers})
+
+		// Since lines is used by_ref, it will still be usable after headers is set, better yet 
+		// it SHOULD be placed either ON the message_body's first line or just before it
+		let headers = 
+			lines.by_ref().map_while(|r| {
+				let s = r.ok()?;
+				s.split_once(':')
+					.map(|(k, v)| (k.trim().into(), v.trim().into()))
+			}).collect();
+		// TODO: support for method_body
+		Ok(Self {method, path, headers, vers})
+
 	}
 
 	pub fn path(&self) -> &Path {
