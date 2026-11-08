@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import { useRecipeVoice, type RecipeVoiceCommand } from '../hooks/useRecipeVoice'
 import { RECIPES } from '../types/recipe'
 import { useRecipeSteps } from '../hooks/useRecipeSteps'
 import type { Recipe } from '../types/recipe'
@@ -6,11 +8,49 @@ import type { Recipe } from '../types/recipe'
 function RecipeView({ recipe }: { recipe: Recipe }) {
   const { stepIndex, step, total, isFirst, isLast, nextStep, previousStep } =
     useRecipeSteps(recipe)
+  const [lastAction, setLastAction] = useState<string | null>(null)
+
+  function repeatCurrentStep() {
+    setLastAction(`repeatStep() called - "${step?.text ?? 'No steps available'}"`)
+  }
+
+  function startTimer() {
+    setLastAction('startTimer() called (demo only; no timer is running)')
+  }
+
+  function stopTimer() {
+    setLastAction('stopTimer() called (demo only; no timer is running)')
+  }
+
+  const demoCommandHandlers: Record<RecipeVoiceCommand, () => void> = {
+    next: nextStep,
+    back: previousStep,
+    repeat: repeatCurrentStep,
+    'start timer': startTimer,
+    'stop timer': stopTimer,
+  }
+  const voice = useRecipeVoice((command) => demoCommandHandlers[command]())
+  const voiceMessage = voice.status === 'loading'
+    ? 'Loading voice recognition...'
+    : voice.status === 'error'
+      ? `Voice recognition unavailable: ${voice.error ?? 'Unknown error'}`
+      : voice.isAwake
+        ? 'Wake word heard. Say a command within 6 seconds.'
+        : 'Listening. Say "Hey Chef" to activate.'
 
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-4 px-6 py-16">
       <Link to="/" className="text-indigo-600 underline">Back to cookbook</Link>
       <h1 className="text-3xl font-bold">{recipe.title}</h1>
+
+      <section aria-label="Voice controls" className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+        <h2 className="text-xl font-semibold">Voice controls</h2>
+        <p aria-live="polite" className="mt-2">{voiceMessage}</p>
+        <p className="mt-1 text-sm text-slate-600">
+          Commands: "next," "back," "repeat," "start timer," or "stop timer."
+        </p>
+        {lastAction && <p aria-live="polite" className="mt-2 text-sm">{lastAction}</p>}
+      </section>
 
       <h2 className="text-xl font-semibold">Ingredients</h2>
       <ul className="list-disc pl-6">
@@ -24,11 +64,11 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
           </h2>
           <p className="text-lg">{step.text}</p>
           <div className="flex gap-2">
-            <button type="button" onClick={previousStep} disabled={isFirst}
+            <button type="button" onClick={() => { previousStep(); setLastAction('previousStep() called') }} disabled={isFirst}
               className="rounded-lg border border-slate-300 px-4 py-2 disabled:opacity-40">
               Previous
             </button>
-            <button type="button" onClick={nextStep} disabled={isLast}
+            <button type="button" onClick={() => { nextStep(); setLastAction('nextStep() called') }} disabled={isLast}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-40">
               Next
             </button>
