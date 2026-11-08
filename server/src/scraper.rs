@@ -13,8 +13,7 @@ impl Drop for ChromeDriverGuard {
     }
 }
 
-#[tokio::main]
-async fn main() -> WebDriverResult<()> {
+pub async fn run() -> WebDriverResult<()> {
     let _chromedriver = ChromeDriverGuard(
         Command::new("./webdrivers/linux-chromedriver")
             .arg("--port=9515")
@@ -64,20 +63,21 @@ async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<()> {
     }
 
     let html = driver.source().await?;
-    let output = html_selector(html);
-    fs::write("output.txt", output)?;
+    let ingredients_output = html_selector(&html, "<ul class=\"mm-recipes-structured-ingredients__list\">", "</ul>");
+    fs::write("ingredients-output.txt", ingredients_output)?;
+    let steps_output = html_selector(&html, "<ol id=\"mntl-sc-block_30-0\" class=\"comp mntl-sc-block mntl-sc-block-startgroup mntl-sc-block-group--OL\">", "</ol>");
+    fs::write("steps-output.txt", steps_output)?;
 
     Ok(())
 }
 
-fn html_selector(file: String) -> String {
+fn html_selector(file: &str, start_tag: &str, end_tag: &str) -> String {
     let bytes = file.as_bytes();
+    let start_tag = start_tag.as_bytes();
+    let end_tag = end_tag.as_bytes();
     let mut start_tag_index = 0;
     let mut end_tag_index = 0;
     let mut write = false;
-
-    let start_tag = b"<ul class=\"mm-recipes-structured-ingredients__list\">";
-    let end_tag = b"</ul>";
 
     let mut output = String::new();
 
