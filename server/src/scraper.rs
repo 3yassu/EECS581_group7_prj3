@@ -33,7 +33,7 @@ async fn main() -> WebDriverResult<()> {
 
     driver.maximize_window().await?;
     
-    let scrape_result = scrape(&driver, "https://www.allrecipes.com/one-pot-teriyaki-chicken-casserole-recipe-11960287").await;
+    let scrape_result = scrape(&driver, "https://www.allrecipes.com/recipe/9191/pumpkin-soup/").await;
     let quit_result = driver.quit().await;
     scrape_result?;
     quit_result
@@ -64,7 +64,48 @@ async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<()> {
     }
 
     let html = driver.source().await?;
-    fs::write("output.txt", html)?;
+    let output = html_selector(html);
+    fs::write("output.txt", output)?;
 
     Ok(())
+}
+
+fn html_selector(file: String) -> String {
+    let bytes = file.as_bytes();
+    let mut start_tag_index = 0;
+    let mut end_tag_index = 0;
+    let mut write = false;
+
+    let start_tag = b"<ul class=\"mm-recipes-structured-ingredients__list\">";
+    let end_tag = b"</ul>";
+
+    let mut output = String::new();
+
+    for &character in bytes.iter() {
+        if character == start_tag[start_tag_index] {
+            start_tag_index += 1;
+            if start_tag_index == start_tag.len() {
+                write = true;
+                start_tag_index = 0;
+            }
+        } else {
+            start_tag_index = 0;
+        }
+
+        if character == end_tag[end_tag_index] {
+            end_tag_index += 1;
+            if end_tag_index == end_tag.len() {
+                write = false;
+                end_tag_index = 0;
+            }
+        } else {
+            end_tag_index = 0;
+        }
+
+        if write {
+            output.push(character as char);
+        }
+    }
+
+    output
 }
