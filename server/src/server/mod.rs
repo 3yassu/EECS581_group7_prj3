@@ -34,9 +34,7 @@ pub fn init_server() -> Result<()>{
 }
 
 fn handle_connection(mut stream: TcpStream) -> Result<()>{
-	let response = match Request::from_stream(&stream).and_then(Response::from_request) {
-		Ok(res) => res,
-		Err(err) => Response::from_error(&err),
-	};
+	let response = Request::from_stream(&stream)
+		.and_then(Response::try_from).unwrap_or_else(Response::from);
 	response.send(&mut stream)
 }

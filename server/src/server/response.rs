@@ -13,6 +13,30 @@ pub struct Response {
 	pub inner: Vec<u8>,
 }
 
+impl TryFrom<Request> for Response {
+	type Error = Error;
+	fn try_from(request: Request) -> Result<Self>{		
+		let path = request.path();
+		let inner = fs::read(path)?;
+		let headers = vec![("Content-Type".into(), Response::get_type(path).into())];
+		Ok(Self { code: 200, text: "OK".into(), headers, inner })
+	}
+}
+
+impl From<Error> for Response {
+
+	fn from(value: Error) -> Self {
+		let (code, text) = match value.kind() {
+			ErrorKind::InvalidRequest => (400, "BAD REQUEST"),
+			ErrorKind::PermissionDenied => (403, "FORBIDDEN"),
+			ErrorKind::NotFound => (404, "NOT FOUND"),
+			ErrorKind::InvalidMethod => (405, "METHOD NOT ALLOWED"),
+			ErrorKind::IO(_) => (500, "INTERNAL SERVER ERROR"),
+		};
+		Self { code, text: text.into(), headers: Vec::new(), inner: Vec::new() }
+	}
+}
+
 impl Response {
 	fn get_type(path: &Path) -> &'static str {
 	    match path.extension().and_then(std::ffi::OsStr::to_str) {
@@ -27,26 +51,6 @@ impl Response {
     	    _ => "application/octet-stream",
     	}
 	}
-
-	pub fn from_request(request: Request) -> Result<Self>{		
-		let path = request.path();
-		let inner = fs::read(path)?;
-		let headers = vec![("Content-Type".into(), Response::get_type(path).into())];
-		Ok(Self { code: 200, text: "OK".into(), headers, inner })
-	}
-
-	// Returns the correct error
-	pub fn from_error(err: &Error) -> Self {
-		let (code, text) = match err.kind() {
-			ErrorKind::InvalidRequest => (400, "BAD REQUEST"),
-			ErrorKind::PermissionDenied => (403, "FORBIDDEN"),
-			ErrorKind::NotFound => (404, "NOT FOUND"),
-			ErrorKind::InvalidMethod => (405, "METHOD NOT ALLOWED"),
-			ErrorKind::IO(_) => (500, "INTERNAL SERVER ERROR"),
-		};
-		Self { code, text: text.into(), headers: Vec::new(), inner: Vec::new() }
-	}
-
 
 	pub fn send(&self, stream: &mut TcpStream) -> Result<()>{
     write!(stream, "HTTP/1.1 {} {}\r\n", self.code, self.text)?;
