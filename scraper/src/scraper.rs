@@ -4,6 +4,7 @@ use serde::Serialize;
 use std::fmt;
 use std::process::{Child, Command};
 use std::time::Duration;
+use std::path::Path;
 
 struct ChromeDriverGuard(Child);
 
@@ -30,6 +31,7 @@ pub enum ScraperError {
     WebDriver(WebDriverError),
     Runtime(std::io::Error),
     Json(serde_json::Error),
+    DriverVersion(String)
 }
 
 impl fmt::Display for ScraperError {
@@ -38,6 +40,7 @@ impl fmt::Display for ScraperError {
             ScraperError::WebDriver(err) => write!(f, "webdriver error: {err}"),
             ScraperError::Runtime(err) => write!(f, "tokio runtime error: {err}"),
             ScraperError::Json(err) => write!(f, "json error: {err}"),
+            ScraperError::DriverVersion(err) => write!(f, "driver version error: {err}"),
         }
     }
 }
@@ -58,8 +61,27 @@ impl From<serde_json::Error> for ScraperError {
 
 pub type Result<T> = std::result::Result<T, ScraperError>;
 
+
+#[cfg(target_os = "windows")]
+const fn driver_filename() -> &'static str { "windows-chromedriver.exe" }
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+const fn driver_filename() -> &'static str { "windows-chromedriver.exe" }
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const fn driver_filename() -> &'static str { "mac-x64-chromedriver" }
+
+#[cfg(target_os = "linux")]
+const fn driver_filename() -> &'static str { "linux-chromedriver" }
+
+#[cfg(not(any( target_os = "linux", target_os = "macos", target_os = "windows")))]
+compile_error!("Web scraper only supports MacOS, Linux, & Windows!");
+
+
 // Owns its own tokio runtime so callers don't need one; returns the scraped recipe as a JSON string.
-pub fn run(driver_version: &str) -> Result<String> {
+pub fn run() -> Result<String> {
+    let driver_version = driver_filename();
+
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -68,12 +90,12 @@ pub fn run(driver_version: &str) -> Result<String> {
 }
 
 async fn run_async(driver_version: &str) -> Result<String> {
-    let driver_path = format!("./webdrivers/{driver_version}-chromedriver");
+    let driver_path = Path::new("./webdrivers").join(driver_version);
     let _chromedriver = ChromeDriverGuard(
         Command::new(&driver_path)
             .arg("--port=9515")
             .spawn()
-            .unwrap_or_else(|_| panic!("Failed to start chromedriver at {driver_path}")),
+            .unwrap_or_else(|_| panic!("Failed to start chromedriver at {}", driver_path.display())),
     );
 
     let mut caps = DesiredCapabilities::chrome();
