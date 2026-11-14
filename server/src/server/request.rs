@@ -18,7 +18,7 @@ pub struct Request {
 impl Request {
 
 	pub fn build_path(s: &str) -> Result<PathBuf> {
-    let mut path = PathBuf::from("../frontend/dist/");
+    	let mut path = PathBuf::from("../frontend/dist/");
 		let req_path = s.trim_start_matches('/');
 		if req_path.is_empty() {
 			path.push("index.html")
@@ -28,14 +28,21 @@ impl Request {
 				else {path.push(d)}
 			}
 		}
+		// this order of if statements fixes the bug with refreshing on a recipe page
+		// although it adds a new issue where if the user requests something like
+		// /foo it will return index.html with a 200 (OK)
 		if !path.starts_with("../frontend/dist") {
 			return Err(Error::new(ErrorKind::PermissionDenied));
-		} else if path.is_dir() {
+		}
+		if path.is_dir() {
 			path.push("index.html");
 		}
-
-		Ok(path)
+		if path.is_file() {
+			return Ok(path);
+		}
+		Err(Error::new(ErrorKind::NotFound))
 	}
+
 	pub fn from_stream(stream: &TcpStream) -> Result<Self>{
 		let mut lines = BufReader::new(stream).lines();
 		let req_line =  lines.next().ok_or(Error::new(ErrorKind::InvalidRequest))??;
@@ -59,6 +66,7 @@ impl Request {
 					.map(|(k, v)| (k.trim().into(), v.trim().into()))
 			}).collect();
 		// TODO: support for method_body
+		// Do we need method body's if we are only using get requests?
 		Ok(Self {method, path, headers, vers})
 
 	}

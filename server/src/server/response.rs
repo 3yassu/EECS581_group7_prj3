@@ -28,16 +28,23 @@ impl Response {
     	}
 	}
 
-	pub fn from_request(request: Request) -> Result<Self>{
+	pub fn from_request(request: Request) -> Result<Self>{		
 		let path = request.path();
-		
-		if path.is_file() {
-			let inner = fs::read(path)?;
-			let headers = vec![("Content-Type".into(), Response::get_type(path).into())];
-      Ok(Self {code: 200, text: "OK".into(), headers, inner})
-		} else {
-			Ok(Self {code: 404, text: "NOT FOUND".into(), headers: Vec::new(), inner: Vec::new()})
-		}
+		let inner = fs::read(path)?;
+		let headers = vec![("Content-Type".into(), Response::get_type(path).into())];
+		Ok(Self { code: 200, text: "OK".into(), headers, inner })
+	}
+
+	// Returns the correct error
+	pub fn from_error(err: &Error) -> Self {
+		let (code, text) = match err.kind() {
+			ErrorKind::InvalidRequest => (400, "BAD REQUEST"),
+			ErrorKind::PermissionDenied => (403, "FORBIDDEN"),
+			ErrorKind::NotFound => (404, "NOT FOUND"),
+			ErrorKind::InvalidMethod => (405, "METHOD NOT ALLOWED"),
+			ErrorKind::IO(_) => (500, "INTERNAL SERVER ERROR"),
+		};
+		Self { code, text: text.into(), headers: Vec::new(), inner: Vec::new() }
 	}
 
 
