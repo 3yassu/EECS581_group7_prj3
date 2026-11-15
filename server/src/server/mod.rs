@@ -26,13 +26,15 @@ pub fn init_server() -> Result<()>{
 	//println!("PORT: {}", listener.local_addr()?.port());
 	for stream in listener.incoming() {
 		let stream = stream?;
-		handle_connection(stream)?;
+		if let Err(err) = handle_connection(stream) { // gracefully logs connection errors
+			eprintln!("connection error: {err:?}");
+		}
 	}
 	Ok(())
 }
 
 fn handle_connection(mut stream: TcpStream) -> Result<()>{
-	let request = Request::from_stream(&stream)?;
-	let response = Response::from_request(request)?;
+	let response = Request::from_stream(&stream)
+		.and_then(Response::try_from).unwrap_or_else(Response::from);
 	response.send(&mut stream)
 }

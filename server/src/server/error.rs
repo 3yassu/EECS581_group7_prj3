@@ -9,10 +9,11 @@ pub struct Error {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ErrorKind {
-	InvalidMethod,
-	InvalidRequest,
-	PermissionDenied,
-	IO(std::io::Error),
+	InvalidMethod,		// 405
+	InvalidRequest,		// 400
+	PermissionDenied,	// 403
+	NotFound,			// 404
+	IO(std::io::Error),	// 500
 }
 
 impl From<std::io::Error> for Error {
@@ -27,6 +28,10 @@ impl From<std::io::Error> for Error {
 impl Error {
 	pub fn new(inner: ErrorKind) -> Self {
 		Self {inner}
+	}
+
+	pub fn kind(&self) -> &ErrorKind {
+		&self.inner
 	}
 }
 
