@@ -66,7 +66,7 @@ pub type Result<T> = std::result::Result<T, ScraperError>;
 const fn driver_filename() -> &'static str { "windows-chromedriver.exe" }
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-const fn driver_filename() -> &'static str { "windows-chromedriver.exe" }
+const fn driver_filename() -> &'static str { "mac-arm64-chromedriver" }
 
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
 const fn driver_filename() -> &'static str { "mac-x64-chromedriver" }
