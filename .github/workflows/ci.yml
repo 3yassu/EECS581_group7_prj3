@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The workflow only needs to read the repo.
+permissions:
+  contents: read
+
+# If you push again while a run is in progress, cancel the old run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (npm build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      # lfs is intentionally off: the build doesn't need the 41 MB vosk model,
+      # and downloading it on every run would burn the repo's LFS bandwidth quota.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22 # vite 8 needs Node 20.19+ or 22.12+
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+
+  rust:
+    name: Rust (${{ matrix.crate }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: [scraper, server]
+    defaults:
+      run:
+        working-directory: ${{ matrix.crate }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # edition = "2024" needs Rust 1.85+, which current stable satisfies.
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Caches ~/.cargo and target/ between runs.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+
+      # --locked fails if Cargo.lock is out of date with Cargo.toml.
+      - run: cargo build --locked
+      - run: cargo test --locked
