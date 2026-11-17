@@ -1,4 +1,4 @@
-.PHONY: build run clean dev
+.PHONY= build run clean dev
 
 all: run
 
