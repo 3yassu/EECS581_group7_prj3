@@ -12,6 +12,8 @@ export type Recipe = {
   steps: RecipeStep[]
 }
 
+export type SavedRecipe = Recipe & { slug: string }
+
 //hardcoded for testing
 export const RECIPES: Recipe[] = [
   {
