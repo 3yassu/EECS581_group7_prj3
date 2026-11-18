@@ -6,6 +6,8 @@ use std::process::{Child, Command};
 use std::time::Duration;
 use std::path::Path;
 
+use crate::tags::ingredient_tags;
+
 struct ChromeDriverGuard(Child);
 
 impl Drop for ChromeDriverGuard {
@@ -31,7 +33,8 @@ pub enum ScraperError {
     WebDriver(WebDriverError),
     Runtime(std::io::Error),
     Json(serde_json::Error),
-    DriverVersion(String)
+    DriverVersion(String),
+    UnsupportedSite(String),
 }
 
 impl fmt::Display for ScraperError {
@@ -41,6 +44,7 @@ impl fmt::Display for ScraperError {
             ScraperError::Runtime(err) => write!(f, "tokio runtime error: {err}"),
             ScraperError::Json(err) => write!(f, "json error: {err}"),
             ScraperError::DriverVersion(err) => write!(f, "driver version error: {err}"),
+            ScraperError::UnsupportedSite(url) => write!(f, "no tags configured for site: {url}"),
         }
     }
 }
@@ -109,9 +113,9 @@ async fn run_async(driver_version: &str) -> Result<String> {
 
     driver.maximize_window().await?;
 
-    let scrape_result = scrape(&driver, "https://www.allrecipes.com/recipe/9191/pumpkin-soup/").await;
+    let scrape_result = scrape(&driver, "https://www.allrecipes.com/savory-dutch-baby-recipe-12148516").await;
     let quit_result = driver.quit().await;
-    let recipe = scrape_result?;
+    let recipe = scrape_result??;
     quit_result?;
 
     Ok(serde_json::to_string(&recipe)?)
@@ -131,7 +135,7 @@ async fn connect_with_retry(url: &str, caps: ChromeCapabilities) -> WebDriverRes
     Err(last_err.expect("at least one connection attempt is always made"))
 }
 
-async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<Recipe> {
+async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<Result<Recipe>> {
     driver.goto(recipe_url).await?;
 
     for _ in 0..20 {
@@ -141,11 +145,15 @@ async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<Recipe>
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
-    let html = driver.source().await?;
-    let ingredients_html = html_selector(&html, "<ul class=\"mm-recipes-structured-ingredients__list\">", "</ul>");
-    let steps_html = html_selector(&html, "<ol id=\"mntl-sc-block_30-0\" class=\"comp mntl-sc-block mntl-sc-block-startgroup mntl-sc-block-group--OL\">", "</ol>");
+    let Some(site_tags) = ingredient_tags(recipe_url).into_iter().next() else {
+        return Ok(Err(ScraperError::UnsupportedSite(recipe_url.to_string())));
+    };
 
-    Ok(Recipe { ingredients_html, steps_html })
+    let html = driver.source().await?;
+    let ingredients_html = html_selector(&html, site_tags.ingredients_start, site_tags.ingredients_end);
+    let steps_html = html_selector(&html, site_tags.steps_start, site_tags.steps_end);
+
+    Ok(Ok(Recipe { ingredients_html, steps_html }))
 }
 
 fn html_selector(file: &str, start_tag: &str, end_tag: &str) -> String {
