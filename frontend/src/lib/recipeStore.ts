@@ -1,15 +1,40 @@
 import { RECIPES } from '../types/recipe'
 import type { Recipe, SavedRecipe } from '../types/recipe'
-import { uniqueSlug } from './slug'
 
-// "v1" so a future change to the saved shape can use a new key (v2) instead of
-// choking on old data.
-const STORAGE_KEY = 'cookbook:recipes:v1'
+// v2 because we changed what 
+const STORAGE_KEY = 'cookbook:recipes:v2'
 
-// Anything read from localStorage is `unknown`: types vanish at runtime and
-// users (or old versions of the app) can leave anything in there.
+// changes recipe name to id string
+function slugify(title: string): string {
+  const slug = title
+    .normalize('NFKD') // split "é" into "e" + a combining accent mark
+    .replace(/[\u0300-\u036f]/g, '') // drop the accent marks
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-') // anything that isn't a letter/digit becomes "-"
+    .replace(/^-+|-+$/g, '') // no leading/trailing "-"
+  return slug || 'recipe' // titles with no a-z0-9 at all (e.g. emoji only)
+}
+ 
+// Like slugify, but adds -2, -3, ... if that slug is already taken.
+function uniqueSlug(title: string, taken: string[]): string {
+  const base = slugify(title)
+  if (!taken.includes(base)) return base
+  let n = 2
+  while (taken.includes(`${base}-${n}`)) n++
+  return `${base}-${n}`
+}
+
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null
+}
+
+function isIngredient(x: unknown): boolean {
+  return (
+    isRecord(x) &&
+    typeof x.quantity === 'string' &&
+    typeof x.unit === 'string' &&
+    typeof x.name === 'string'
+  )
 }
 
 function isOptionalNumber(x: unknown): boolean {
@@ -25,14 +50,13 @@ function isSavedRecipe(x: unknown): x is SavedRecipe {
     isOptionalNumber(x.servings) &&
     isOptionalNumber(x.totalTimeMinutes) &&
     Array.isArray(x.ingredients) &&
-    x.ingredients.every((i) => typeof i === 'string') &&
+    x.ingredients.every(isIngredient) &&
     Array.isArray(x.steps) &&
     x.steps.every((s) => isRecord(s) && typeof s.text === 'string' && isOptionalNumber(s.timerSeconds))
   )
 }
 
-// The hardcoded recipes are only the starting point for a brand-new visitor.
-// Possibly change this so they aren't "raisins" and "bacon"
+
 function seedRecipes(): SavedRecipe[] {
   const saved: SavedRecipe[] = []
   for (const recipe of RECIPES) {
