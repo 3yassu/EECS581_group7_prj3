@@ -1,8 +1,7 @@
 import { RECIPES } from '../types/recipe'
 import type { Recipe, SavedRecipe } from '../types/recipe'
 
-// v2 because we changed what 
-const STORAGE_KEY = 'cookbook:recipes:v2'
+const STORAGE_KEY = 'cookbook:recipes:v1'
 
 // changes recipe name to id string
 function slugify(title: string): string {
