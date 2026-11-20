@@ -9,9 +9,20 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
   const { stepIndex, step, total, isFirst, isLast, nextStep, previousStep } =
     useRecipeSteps(recipe)
   const [lastAction, setLastAction] = useState<string | null>(null)
+  const [ingredientsOpen, setIngredientsOpen] = useState(true)
 
   function repeatCurrentStep() {
     setLastAction(`repeatStep() called - "${step?.text ?? 'No steps available'}"`)
+  }
+
+  function showIngredients() {
+    setIngredientsOpen(true)
+    setLastAction('showIngredients() called')
+  }
+
+  function closeIngredients() {
+    setIngredientsOpen(false)
+    setLastAction('closeIngredients() called')
   }
 
   function startTimer() {
@@ -52,10 +63,15 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
         {lastAction && <p aria-live="polite" className="mt-2 text-sm">{lastAction}</p>}
       </section>
 
-      <h2 className="text-xl font-semibold">Ingredients</h2>
-      <ul className="list-disc pl-6">
-        {recipe.ingredients.map((ing) => <li key={ing}>{ing}</li>)}
-      </ul>
+      <section>
+      <h2 className="text-xl font-semibold">
+        <button type="button" aria-expanded={ingredientsOpen} aria-controls="ingredients-list"
+          onClick={ingredientsOpen ? closeIngredients : showIngredients} className="flex w-full items-center justify-between rounded-lg border border-slate-300 px-4 py-3 text-left hover:bg-slate-50">
+          Ingredients <span aria-hidden="true">{ingredientsOpen ? '▾' : '▸'}</span>
+        </button>
+      </h2>
+      <ul id="ingredients-list" hidden={!ingredientsOpen} className="list-disc pl-10 pt-3"> {recipe.ingredients.map((ing) => <li key={ing}>{ing}</li>)} </ul>
+      </section>
 
       {step ? (
         <section className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4">
