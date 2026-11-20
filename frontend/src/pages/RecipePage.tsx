@@ -9,9 +9,20 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
   const { stepIndex, step, total, isFirst, isLast, nextStep, previousStep } =
     useRecipeSteps(recipe)
   const [lastAction, setLastAction] = useState<string | null>(null)
+  const [ingredientsOpen, setIngredientsOpen] = useState(true)
 
   function repeatCurrentStep() {
     setLastAction(`repeatStep() called - "${step?.text ?? 'No steps available'}"`)
+  }
+
+  function showIngredients() {
+    setIngredientsOpen(true)
+    setLastAction('showIngredients() called')
+  }
+
+  function closeIngredients() {
+    setIngredientsOpen(false)
+    setLastAction('closeIngredients() called')
   }
 
   function startTimer() {
