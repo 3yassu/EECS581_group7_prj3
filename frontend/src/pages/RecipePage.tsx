@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router'
 import { useRecipeVoice, type RecipeVoiceCommand } from '../hooks/useRecipeVoice'
 import { useRecipes } from '../hooks/useRecipe'
 import { useRecipeSteps } from '../hooks/useRecipeSteps'
-import type { Recipe } from '../types/recipe'
+import { formatIngredient, type Recipe } from '../types/recipe'
 
 function RecipeView({ recipe }: { recipe: Recipe }) {
   const { stepIndex, step, total, isFirst, isLast, nextStep, previousStep } =
@@ -54,7 +54,7 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
 
       <h2 className="text-xl font-semibold">Ingredients</h2>
       <ul className="list-disc pl-6">
-        {recipe.ingredients.map((ing) => <li key={ing}>{ing}</li>)}
+        {recipe.ingredients.map((ing, i) => <li key={i}>{formatIngredient(ing)}</li>)}
       </ul>
 
       {step ? (

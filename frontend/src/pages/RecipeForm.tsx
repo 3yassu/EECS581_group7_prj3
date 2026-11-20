@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { KeyboardEvent, SubmitEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { addRecipe } from '../lib/recipeStore'
+import { formatIngredient, type Ingredient } from '../types/recipe'
 
 const inputClass = 'min-w-0 rounded-lg border border-slate-300 px-3 py-2'
 const addButtonClass = 'rounded-lg border border-slate-300 px-3 py-2 hover:bg-slate-50'
@@ -10,7 +11,7 @@ const removeButtonClass = 'text-sm text-rose-600 underline'
 export default function RecipeForm() {
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
-  const [ingredients, setIngredients] = useState<string[]>([])
+  const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [steps, setSteps] = useState<string[]>([])
   const [ingredientDraft, setIngredientDraft] = useState('')
   const [stepDraft, setStepDraft] = useState('')
@@ -22,7 +23,8 @@ export default function RecipeForm() {
       setError('Type the ingredient first.')
       return
     }
-    setIngredients((list) => [...list, text])
+    // One free-text box for now
+    setIngredients((list) => [...list, { quantity: '', unit: '', name: text }])
     setIngredientDraft('')
     setError(null)
   }
@@ -79,7 +81,7 @@ export default function RecipeForm() {
           <ul className="flex flex-col gap-1">
             {ingredients.map((ing, i) => (
               <li key={i} className="flex items-center justify-between gap-2">
-                <span>{ing}</span>
+                <span>{formatIngredient(ing)}</span>
                 <button type="button" className={removeButtonClass}
                   onClick={() => setIngredients((list) => list.filter((_, j) => j !== i))}>
                   Remove
