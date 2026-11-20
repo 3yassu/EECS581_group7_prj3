@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useRecipeVoice, type RecipeVoiceCommand } from '../hooks/useRecipeVoice'
-import { RECIPES } from '../types/recipe'
+import { useRecipes } from '../hooks/useRecipe'
 import { useRecipeSteps } from '../hooks/useRecipeSteps'
 import type { Recipe } from '../types/recipe'
 
@@ -82,9 +82,9 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
 }
 
 export default function RecipePage() {
-  const { index } = useParams()
-  const i = Number(index)
-  const recipe = Number.isInteger(i) && i >= 0 ? RECIPES.at(i) : undefined
+  const { slug } = useParams()
+  const recipes = useRecipes()
+  const recipe = recipes.find((r) => r.slug === slug)
 
   if (!recipe) {
     return (

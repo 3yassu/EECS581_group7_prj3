@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { RECIPES } from '../types/recipe'
+import { useRecipes } from '../hooks/useRecipe'
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
 import { parseHttpUrl, importRecipe } from '../lib/url'
@@ -41,14 +41,15 @@ function ImportForm() {
 }
 
 export default function CookbookPage() {
+  const recipes = useRecipes()
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-8 px-6 py-16">
       <h1 className="text-3xl font-bold">My Cookbook</h1>
       <ImportForm />
       <ul className="flex flex-col gap-2">
-        {RECIPES.map((recipe, index) => (
-            <li key={index}>
-                <Link to={`/recipe/${index}`} className="block rounded-lg border border-slate-200 px-4 py-3 hover:bg-slate-50">
+        {recipes.map((recipe) => (
+            <li key={recipe.slug}>
+                <Link to={`/recipe/${recipe.slug}`} className="block rounded-lg border border-slate-200 px-4 py-3 hover:bg-slate-50">
               {recipe.title}
             </Link>
           </li>
