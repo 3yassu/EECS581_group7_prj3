@@ -6,7 +6,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<CookbookPage />} />
-      <Route path="/recipe/:index" element={<RecipePage />} />
+      <Route path="/recipe/:slug" element={<RecipePage />} />
     </Routes>
   )
 }

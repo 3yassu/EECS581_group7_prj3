@@ -3,13 +3,25 @@ export type RecipeStep = {
   timerSeconds?: number   
 }
 
+export type Ingredient = {
+  quantity: string 
+  unit: string     
+  name: string     
+}
+
 export type Recipe = {
   title: string
   sourceUrl: string
   servings?: number
   totalTimeMinutes?: number
-  ingredients: string[]
+  ingredients: Ingredient[]
   steps: RecipeStep[]
+}
+
+export type SavedRecipe = Recipe & { slug: string }
+
+export function formatIngredient({ quantity, unit, name }: Ingredient): string {
+  return [quantity, unit, name].filter((part) => part !== '').join(' ')
 }
 
 //hardcoded for testing
@@ -19,7 +31,7 @@ export const RECIPES: Recipe[] = [
     sourceUrl: 'https://www.allrecipes.com/recipe/281936/thick-cut-bacon-in-the-oven/',
     servings: 8,
     totalTimeMinutes: 20,
-    ingredients: ['16 slices thick-cut bacon'],
+    ingredients: [{quantity: '16', unit: 'slices', name: "thick-cut bacon"}],
     steps: [
       { text: 'Preheat the oven to 400 degrees F (200 degrees C). ' },
       { text: 'Line a rimmed baking sheet with aluminum foil and place a baking rack on top. Arrange bacon strips on the baking rack. ' },
@@ -31,7 +43,7 @@ export const RECIPES: Recipe[] = [
     sourceUrl: 'https://en.wikipedia.org/wiki/The_California_Raisins',
     servings: 120,
     totalTimeMinutes: 0,
-    ingredients: ['120 raisins'],
+    ingredients: [{quantity: '120', unit: '', name: 'raisins'}],
     steps: [],
   },
   {
@@ -39,7 +51,7 @@ export const RECIPES: Recipe[] = [
     sourceUrl: 'https://www.allrecipes.com/recipe/18906/awesome-and-easy-creamy-corn-casserole/',
     servings: 8,
     totalTimeMinutes: 55,
-    ingredients: ['1 (15 ounce) can whole kernel corn, drained', '1 (14.75 ounce) can creamed corn', '1 (8.5 ounce) package dry cornbread mix', '1 cup sour cream', '1/2 cup butter, melted', '2 large eggs, beaten'],
+    ingredients: [{quantity: '1', unit: '15 ounce can', name: 'whole kernel corn, drained'}, {quantity: '1', unit: '14.75 ounce can', name: 'creamed corn'}],
     steps: [
       {text: ' *makes corn casserole like a boss* ' },
     ],

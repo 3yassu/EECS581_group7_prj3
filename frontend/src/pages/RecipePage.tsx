@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useRecipeVoice, type RecipeVoiceCommand } from '../hooks/useRecipeVoice'
-import { RECIPES } from '../types/recipe'
+import { useRecipes } from '../hooks/useRecipe'
 import { useRecipeSteps } from '../hooks/useRecipeSteps'
-import type { Recipe } from '../types/recipe'
+import { formatIngredient, type Recipe } from '../types/recipe'
 
 function RecipeView({ recipe }: { recipe: Recipe }) {
   const { stepIndex, step, total, isFirst, isLast, nextStep, previousStep } =
@@ -63,15 +63,10 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
         {lastAction && <p aria-live="polite" className="mt-2 text-sm">{lastAction}</p>}
       </section>
 
-      <section>
-      <h2 className="text-xl font-semibold">
-        <button type="button" aria-expanded={ingredientsOpen} aria-controls="ingredients-list"
-          onClick={ingredientsOpen ? closeIngredients : showIngredients} className="flex w-full items-center justify-between rounded-lg border border-slate-300 px-4 py-3 text-left hover:bg-slate-50">
-          Ingredients <span aria-hidden="true">{ingredientsOpen ? '▾' : '▸'}</span>
-        </button>
-      </h2>
-      <ul id="ingredients-list" hidden={!ingredientsOpen} className="list-disc pl-10 pt-3"> {recipe.ingredients.map((ing) => <li key={ing}>{ing}</li>)} </ul>
-      </section>
+      <h2 className="text-xl font-semibold">Ingredients</h2>
+      <ul className="list-disc pl-6">
+        {recipe.ingredients.map((ing, i) => <li key={i}>{formatIngredient(ing)}</li>)}
+      </ul>
 
       {step ? (
         <section className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4">
@@ -98,9 +93,9 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
 }
 
 export default function RecipePage() {
-  const { index } = useParams()
-  const i = Number(index)
-  const recipe = Number.isInteger(i) && i >= 0 ? RECIPES.at(i) : undefined
+  const { slug } = useParams()
+  const recipes = useRecipes()
+  const recipe = recipes.find((r) => r.slug === slug)
 
   if (!recipe) {
     return (
