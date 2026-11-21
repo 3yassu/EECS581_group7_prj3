@@ -1,6 +1,6 @@
 import { Model, type Model as VoskModel } from "vosk-browser";
 
-const MODEL_URL = '/models/vosk-model-small-en-us-0.15.model';
+const MODEL_URL = '/models/vosk-model-small-en-us-0.15.tar.gz';
 
 let modelPromise: Promise<VoskModel> | null = null;
 
