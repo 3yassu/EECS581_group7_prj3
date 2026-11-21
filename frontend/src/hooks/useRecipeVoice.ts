@@ -2,7 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { startListening } from '../lib/vosk';
 
 const WAKE = 'hey chef';
-const COMMANDS = ['next', 'back', 'repeat', 'start timer', 'stop timer'] as const;
+const COMMANDS = [
+  'next',
+  'back',
+  'read step',
+  'stop reading',
+  'restart timer',
+  'start timer',
+  'pause timer',
+  'end timer',
+  'stop timer',
+] as const;
 const GRAMMAR = [WAKE, ...COMMANDS, '[unk]']; // [unk] absorbs everything else
 const AWAKE_MS = 6000;
 
