@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { useRecipeVoice, type RecipeVoiceCommand } from '../hooks/useRecipeVoice'
 import { useRecipes } from '../hooks/useRecipe'
@@ -83,6 +83,8 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
   const { stepIndex, step, total, isFirst, isLast, nextStep, previousStep } =
     useRecipeSteps(recipe)
   const [lastAction, setLastAction] = useState<string | null>(null)
+  const [readStatus, setReadStatus] = useState<string | null>(null)
+  const activeUtterance = useRef<SpeechSynthesisUtterance | null>(null)
   const timerStorageKey = `cookbook:timers:v1:${recipeSlug}`
   const [stepTimers, setStepTimers] = useState<Record<number, StepTimerState>>(
     () => loadStepTimers(timerStorageKey, recipe),
@@ -139,17 +141,26 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
     })
   }
 
+  function cancelReading() {
+    activeUtterance.current = null
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    setReadStatus(null)
+  }
+
   function goToNextStep() {
+    cancelReading()
     setIsTimerModalOpen(false)
     nextStep()
   }
 
   function goToPreviousStep() {
+    cancelReading()
     setIsTimerModalOpen(false)
     previousStep()
   }
 
   function startTimer() {
+    cancelReading()
     if (timer.duration <= 0) {
       setTimerMinutesDraft('')
       setIsTimerModalOpen(true)
@@ -166,6 +177,7 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
   }
 
   function pauseTimer() {
+    cancelReading()
     const remaining = timer.deadline === null
       ? timer.remaining
       : Math.max(0, Math.ceil((timer.deadline - Date.now()) / 1000))
@@ -174,11 +186,13 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
   }
 
   function endTimer() {
+    cancelReading()
     updateTimer({ deadline: null, running: false, remaining: 0, visible: false })
     setLastAction('Timer ended')
   }
 
   function restartTimer() {
+    cancelReading()
     if (timer.duration <= 0) {
       setTimerMinutesDraft('')
       setIsTimerModalOpen(true)
@@ -194,6 +208,7 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
   }
 
   function confirmTimerDuration() {
+    cancelReading()
     const minutes = Number(timerMinutesDraft)
     if (!Number.isFinite(minutes) || minutes <= 0) {
       setLastAction('Enter a duration greater than 0 minutes.')
@@ -223,14 +238,47 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
     return `${minutes}:${secs.toString().padStart(2, '0')}`
   }
 
-  function repeatCurrentStep() {
-    setLastAction(`repeatStep() called - "${step?.text ?? 'No steps available'}"`)
+  function readCurrentStep() {
+    cancelReading()
+    if (!step) {
+      setReadStatus('There is no step to read.')
+      return
+    }
+
+    if (!('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      setReadStatus('Read-aloud is unavailable in this browser.')
+      return
+    }
+
+    const utterance = new SpeechSynthesisUtterance(
+      `Step ${stepIndex + 1} of ${total}. ${step.text}`,
+    )
+    activeUtterance.current = utterance
+    utterance.onend = () => {
+      if (activeUtterance.current === utterance) {
+        activeUtterance.current = null
+        setReadStatus(null)
+      }
+    }
+    utterance.onerror = () => {
+      if (activeUtterance.current === utterance) {
+        activeUtterance.current = null
+        setReadStatus('Could not read this step aloud.')
+      }
+    }
+    window.speechSynthesis.speak(utterance)
+    setReadStatus(`Reading step ${stepIndex + 1}`)
+  }
+
+  function stopReading() {
+    cancelReading()
   }
 
   const demoCommandHandlers: Record<RecipeVoiceCommand, () => void> = {
     next: goToNextStep,
     back: goToPreviousStep,
-    repeat: repeatCurrentStep,
+    'read step': readCurrentStep,
+    'stop reading': stopReading,
     'start timer': startTimer,
     'pause timer': pauseTimer,
     'end timer': endTimer,
@@ -255,10 +303,11 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
         <h2 className="text-xl font-semibold">Voice controls</h2>
         <p aria-live="polite" className="mt-2">{voiceMessage}</p>
         <p className="mt-1 text-sm text-slate-600">
-          Commands: "next," "back," "repeat," "start timer," "pause timer,"
-          "end timer," or "restart timer."
+          Commands: "next," "back," "read step," "stop reading," "start timer,"
+          "pause timer," "end timer," or "restart timer."
         </p>
         {lastAction && <p aria-live="polite" className="mt-2 text-sm">{lastAction}</p>}
+        {readStatus && <p aria-live="polite" className="mt-2 text-sm">{readStatus}</p>}
       </section>
 
       {timer.visible && (

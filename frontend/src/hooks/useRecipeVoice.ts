@@ -5,7 +5,8 @@ const WAKE = 'hey chef';
 const COMMANDS = [
   'next',
   'back',
-  'repeat',
+  'read step',
+  'stop reading',
   'restart timer',
   'start timer',
   'pause timer',
