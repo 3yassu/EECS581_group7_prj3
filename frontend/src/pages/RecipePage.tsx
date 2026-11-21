@@ -88,7 +88,9 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
     () => loadStepTimers(timerStorageKey, recipe),
   )
   const [isTimerModalOpen, setIsTimerModalOpen] = useState(false)
-  const [timerMinutesDraft, setTimerMinutesDraft] = useState('')
+  const [timerHoursDraft, setTimerHoursDraft] = useState('0')
+  const [timerMinutesDraft, setTimerMinutesDraft] = useState('0')
+  const [timerSecondsDraft, setTimerSecondsDraft] = useState('0')
   const timer = stepTimers[stepIndex] ?? {
     duration: step?.timerSeconds ?? 0,
     remaining: step?.timerSeconds ?? 0,
@@ -151,7 +153,9 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
 
   function startTimer() {
     if (timer.duration <= 0) {
-      setTimerMinutesDraft('')
+      setTimerHoursDraft('0')
+      setTimerMinutesDraft('0')
+      setTimerSecondsDraft('0')
       setIsTimerModalOpen(true)
       return
     }
@@ -180,7 +184,9 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
 
   function restartTimer() {
     if (timer.duration <= 0) {
-      setTimerMinutesDraft('')
+      setTimerHoursDraft('0')
+      setTimerMinutesDraft('0')
+      setTimerSecondsDraft('0')
       setIsTimerModalOpen(true)
       return
     }
@@ -194,15 +200,31 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
   }
 
   function confirmTimerDuration() {
-    const minutes = Number(timerMinutesDraft)
-    if (!Number.isFinite(minutes) || minutes <= 0) {
-      setLastAction('Enter a duration greater than 0 minutes.')
+    const hoursText = timerHoursDraft.trim()
+    const minutesText = timerMinutesDraft.trim()
+    const secondsText = timerSecondsDraft.trim()
+    const validWholeNumber = (value: string) => /^\d+$/.test(value)
+
+    if (
+      !validWholeNumber(hoursText) ||
+      !validWholeNumber(minutesText) ||
+      !validWholeNumber(secondsText)
+    ) {
+      setLastAction('Enter whole numbers for hours, minutes, and seconds.')
       return
     }
 
-    const duration = Math.round(minutes * 60)
-    if (duration <= 0) {
-      setLastAction('Enter a duration greater than 0 minutes.')
+    const hours = Number(hoursText)
+    const minutes = Number(minutesText)
+    const seconds = Number(secondsText)
+    if (minutes > 59 || seconds > 59) {
+      setLastAction('Minutes and seconds must be less than 60.')
+      return
+    }
+
+    const duration = hours * 3600 + minutes * 60 + seconds
+    if (!Number.isSafeInteger(duration) || duration <= 0) {
+      setLastAction('Enter a duration greater than 0 seconds.')
       return
     }
 
@@ -218,8 +240,12 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
   }
 
   function formatTimer(seconds: number) {
+    const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor(seconds / 60)
     const secs = seconds % 60
+    if (hours > 0) {
+      return `${hours}:${(minutes % 60).toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    }
     return `${minutes}:${secs.toString().padStart(2, '0')}`
   }
 
@@ -332,22 +358,49 @@ function RecipeView({ recipe, recipeSlug }: { recipe: Recipe; recipeSlug: string
               Set timer duration
             </h2>
             <p className="text-sm text-slate-600">
-              This step does not include a timer. How many minutes?
+              This step does not include a timer. Set a duration.
             </p>
-            <label htmlFor="timer-minutes" className="font-medium">
-              Minutes
-            </label>
-            <input
-              id="timer-minutes"
-              type="number"
-              min="1"
-              step="1"
-              required
-              autoFocus
-              value={timerMinutesDraft}
-              onChange={(event) => setTimerMinutesDraft(event.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2"
-            />
+            <div className="grid grid-cols-3 gap-3">
+              <label htmlFor="timer-hours" className="flex flex-col gap-1 text-sm">
+                Hours
+                <input
+                  id="timer-hours"
+                  type="number"
+                  min="0"
+                  step="1"
+                  autoFocus
+                  value={timerHoursDraft}
+                  onChange={(event) => setTimerHoursDraft(event.target.value)}
+                  className="min-w-0 rounded-lg border border-slate-300 px-3 py-2"
+                />
+              </label>
+              <label htmlFor="timer-minutes" className="flex flex-col gap-1 text-sm">
+                Minutes
+                <input
+                  id="timer-minutes"
+                  type="number"
+                  min="0"
+                  max="59"
+                  step="1"
+                  value={timerMinutesDraft}
+                  onChange={(event) => setTimerMinutesDraft(event.target.value)}
+                  className="min-w-0 rounded-lg border border-slate-300 px-3 py-2"
+                />
+              </label>
+              <label htmlFor="timer-seconds" className="flex flex-col gap-1 text-sm">
+                Seconds
+                <input
+                  id="timer-seconds"
+                  type="number"
+                  min="0"
+                  max="59"
+                  step="1"
+                  value={timerSecondsDraft}
+                  onChange={(event) => setTimerSecondsDraft(event.target.value)}
+                  className="min-w-0 rounded-lg border border-slate-300 px-3 py-2"
+                />
+              </label>
+            </div>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
