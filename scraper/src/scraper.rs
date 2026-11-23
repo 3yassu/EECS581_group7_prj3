@@ -6,6 +6,8 @@ use std::process::{Child, Command};
 use std::time::Duration;
 use std::path::Path;
 
+use crate::tags::{tags, SiteTags};
+
 struct ChromeDriverGuard(Child);
 
 impl Drop for ChromeDriverGuard {
@@ -21,9 +23,34 @@ impl Drop for ChromeDriverGuard {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Ingredient {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantity: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    pub name: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecipeStep {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timer_seconds: Option<u32>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Recipe {
-    pub ingredients_html: String,
-    pub steps_html: String,
+    pub title: String,
+    pub source_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub servings: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_time_minutes: Option<u32>,
+    pub ingredients: Vec<Ingredient>,
+    pub steps: Vec<RecipeStep>,
 }
 
 #[derive(Debug)]
@@ -31,7 +58,8 @@ pub enum ScraperError {
     WebDriver(WebDriverError),
     Runtime(std::io::Error),
     Json(serde_json::Error),
-    DriverVersion(String)
+    DriverVersion(String),
+    UnsupportedSite(String),
 }
 
 impl fmt::Display for ScraperError {
@@ -41,6 +69,7 @@ impl fmt::Display for ScraperError {
             ScraperError::Runtime(err) => write!(f, "tokio runtime error: {err}"),
             ScraperError::Json(err) => write!(f, "json error: {err}"),
             ScraperError::DriverVersion(err) => write!(f, "driver version error: {err}"),
+            ScraperError::UnsupportedSite(url) => write!(f, "no tags configured for site: {url}"),
         }
     }
 }
@@ -60,7 +89,6 @@ impl From<serde_json::Error> for ScraperError {
 }
 
 pub type Result<T> = std::result::Result<T, ScraperError>;
-
 
 #[cfg(target_os = "windows")]
 const fn driver_filename() -> &'static str { "windows-chromedriver.exe" }
@@ -109,9 +137,9 @@ async fn run_async(driver_version: &str) -> Result<String> {
 
     driver.maximize_window().await?;
 
-    let scrape_result = scrape(&driver, "https://www.allrecipes.com/recipe/9191/pumpkin-soup/").await;
+    let scrape_result = scrape(&driver, "https://www.allrecipes.com/savory-dutch-baby-recipe-12148516").await;
     let quit_result = driver.quit().await;
-    let recipe = scrape_result?;
+    let recipe = scrape_result??;
     quit_result?;
 
     Ok(serde_json::to_string(&recipe)?)
@@ -131,7 +159,7 @@ async fn connect_with_retry(url: &str, caps: ChromeCapabilities) -> WebDriverRes
     Err(last_err.expect("at least one connection attempt is always made"))
 }
 
-async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<Recipe> {
+async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<Result<Recipe>> {
     driver.goto(recipe_url).await?;
 
     for _ in 0..20 {
@@ -141,48 +169,160 @@ async fn scrape(driver: &WebDriver, recipe_url: &str) -> WebDriverResult<Recipe>
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
 
-    let html = driver.source().await?;
-    let ingredients_html = html_selector(&html, "<ul class=\"mm-recipes-structured-ingredients__list\">", "</ul>");
-    let steps_html = html_selector(&html, "<ol id=\"mntl-sc-block_30-0\" class=\"comp mntl-sc-block mntl-sc-block-startgroup mntl-sc-block-group--OL\">", "</ol>");
+    let Some(site_tags) = tags(recipe_url).into_iter().next() else {
+        return Ok(Err(ScraperError::UnsupportedSite(recipe_url.to_string())));
+    };
 
-    Ok(Recipe { ingredients_html, steps_html })
+    let html = driver.source().await?;
+    let title = find_all_between(&html, site_tags.title_start, site_tags.title_end)
+        .first()
+        .map(|value| value.trim().to_string())
+        .unwrap_or_default();
+    let servings = find_all_between(&html, site_tags.servings_start, site_tags.servings_end)
+        .first()
+        .and_then(|value| parse_leading_number(value.trim()));
+    let total_time_minutes = find_all_between(&html, site_tags.time_start, site_tags.time_end)
+        .first()
+        .and_then(|value| parse_minutes(value.trim()));
+    let ingredients_html = html_selector(&html, site_tags.ingredients_start, site_tags.ingredients_end);
+    let steps_html = html_selector(&html, site_tags.steps_start, site_tags.steps_end);
+    let ingredients = ingredient_selector(&ingredients_html, &site_tags);
+    let step_texts = steps_selector(&steps_html, &site_tags);
+    let step_seconds = extract_step_time(&step_texts);
+    let steps = step_texts
+        .into_iter()
+        .zip(step_seconds)
+        .map(|(text, seconds)| RecipeStep {
+            text,
+            timer_seconds: (seconds > 0).then_some(seconds),
+        })
+        .collect();
+
+    Ok(Ok(Recipe {
+        title,
+        source_url: recipe_url.to_string(),
+        servings,
+        total_time_minutes,
+        ingredients,
+        steps,
+    }))
+}
+
+fn find_all_between<'a>(html: &'a str, start_tag: &str, end_tag: &str) -> Vec<&'a str> {
+    let mut matches = Vec::new();
+    let mut rest = html;
+
+    while let Some(start_index) = rest.find(start_tag) {
+        let after_start = &rest[start_index + start_tag.len()..];
+        let Some(end_index) = after_start.find(end_tag) else {
+            break;
+        };
+        matches.push(&after_start[..end_index]);
+        rest = &after_start[end_index + end_tag.len()..];
+    }
+
+    matches
 }
 
 fn html_selector(file: &str, start_tag: &str, end_tag: &str) -> String {
-    let bytes = file.as_bytes();
-    let start_tag = start_tag.as_bytes();
-    let end_tag = end_tag.as_bytes();
-    let mut start_tag_index = 0;
-    let mut end_tag_index = 0;
-    let mut write = false;
+    find_all_between(file, start_tag, end_tag).concat()
+}
 
-    let mut output = String::new();
+// Extracts the leading run of digits as a number, ignoring any trailing unit text (e.g. "6 servings" -> 6).
+fn parse_leading_number(value: &str) -> Option<u32> {
+    let digits: String = value.chars().take_while(|ch| ch.is_ascii_digit()).collect();
+    digits.parse().ok()
+}
 
-    for &character in bytes.iter() {
-        if character == start_tag[start_tag_index] {
-            start_tag_index += 1;
-            if start_tag_index == start_tag.len() {
-                write = true;
-                start_tag_index = 0;
-            }
-        } else {
-            start_tag_index = 0;
-        }
+fn parse_minutes(value: &str) -> Option<u32> {
+    let mut total = 0u32;
+    let mut found_any = false;
+    let mut tokens = value.split_whitespace().peekable();
 
-        if character == end_tag[end_tag_index] {
-            end_tag_index += 1;
-            if end_tag_index == end_tag.len() {
-                write = false;
-                end_tag_index = 0;
-            }
-        } else {
-            end_tag_index = 0;
-        }
+    while let Some(token) = tokens.next() {
+        let Ok(amount) = token.parse::<u32>() else { continue };
+        let Some(unit) = tokens.peek() else { continue };
+        let unit = unit.to_ascii_lowercase();
 
-        if write {
-            output.push(character as char);
+        if unit.starts_with("hr") {
+            total += amount * 60;
+            found_any = true;
+        } else if unit.starts_with("min") {
+            total += amount;
+            found_any = true;
         }
     }
 
-    output
+    found_any.then_some(total)
+}
+
+pub fn ingredient_selector(html: &str, tags: &SiteTags) -> Vec<Ingredient> {
+    let [quantity_start, quantity_end, unit_start, unit_end, name_start, name_end] =
+        tags.ingredients_tags;
+
+    find_all_between(html, tags.ingredient_item_start, tags.ingredient_item_end)
+        .into_iter()
+        .map(|item| {
+            let quantity = find_all_between(item, quantity_start, quantity_end)
+                .first()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+            let unit = find_all_between(item, unit_start, unit_end)
+                .first()
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+            let name = find_all_between(item, name_start, name_end)
+                .first()
+                .map(|value| value.trim().to_string())
+                .unwrap_or_default();
+
+            Ingredient { quantity, unit, name }
+        })
+        .collect()
+}
+
+// Parses the steps section HTML into one string per step.
+pub fn steps_selector(html: &str, tags: &SiteTags) -> Vec<String> {
+    let [step_start, step_end] = tags.steps_tags;
+
+    find_all_between(html, step_start, step_end)
+        .into_iter()
+        .map(|step| step.trim().to_string())
+        .collect()
+}
+
+// Finds a duration mentioned in each step (e.g. "20 minutes", "12-15 mins"), in seconds; 0 if none found.
+pub fn extract_step_time(steps: &[String]) -> Vec<u32> {
+    steps.iter().map(|step| parse_step_seconds(step)).collect()
+}
+
+fn parse_step_seconds(step: &str) -> u32 {
+    // Splitting on '-' too turns ranges like "12-15" into separate tokens, so the scan below
+    // naturally keeps the last number before the unit, same as it does for "1 to 2 minutes".
+    let words: Vec<&str> = step
+        .split(|ch: char| ch.is_whitespace() || ch == '-')
+        .filter(|word| !word.is_empty())
+        .collect();
+
+    for (index, word) in words.iter().enumerate() {
+        let Ok(amount) = word.trim_matches(|ch: char| !ch.is_ascii_digit()).parse::<u32>() else { continue };
+        let Some(next_word) = words.get(index + 1) else { continue };
+        let unit = next_word
+            .trim_matches(|ch: char| !ch.is_ascii_alphabetic())
+            .to_ascii_lowercase();
+
+        let multiplier = if unit.starts_with("hr") || unit.starts_with("hour") {
+            3600
+        } else if unit.starts_with("min") {
+            60
+        } else if unit.starts_with("sec") {
+            1
+        } else {
+            continue;
+        };
+
+        return amount * multiplier;
+    }
+
+    0
 }
