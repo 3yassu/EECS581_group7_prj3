@@ -1,4 +1,4 @@
-.PHONY= build run clean dev
+.PHONY: build run clean dev lint
 
 all: run
 
@@ -14,3 +14,6 @@ clean:
 
 dev:
 	npm --prefix frontend run dev
+
+lint:
+	npm --prefix frontend run lint

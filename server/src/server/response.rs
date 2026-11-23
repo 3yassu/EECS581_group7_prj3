@@ -1,9 +1,6 @@
 use super::{BStr, Request, error::{Result, Error, ErrorKind}};
 use std::{
-	fs,
-	net::TcpStream,
-	io::Write,
-	path::Path,
+	fs, io::Write, net::TcpStream, path::{Path, PathBuf}
 };
 
 pub struct Response {
@@ -33,7 +30,9 @@ impl From<Error> for Response {
 			ErrorKind::InvalidMethod => (405, "METHOD NOT ALLOWED"),
 			ErrorKind::IO(_) => (500, "INTERNAL SERVER ERROR"),
 		};
-		Self { code, text: text.into(), headers: Vec::new(), inner: Vec::new() }
+    let path = PathBuf::from("../frontend/dist/index.html");
+		let inner = fs::read(path).unwrap_or_default();
+		Self { code, text: text.into(), headers: Vec::new(), inner }
 	}
 }
 

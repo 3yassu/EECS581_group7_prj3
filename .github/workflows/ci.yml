@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The workflow only needs to read the repo.
+permissions:
+  contents: read
+
+# Cancel a superseded PR run when new commits are pushed, but never cancel
+# runs on main or in the merge queue.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  frontend:
+    name: Frontend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      # lfs is intentionally off: the build doesn't need the 41 MB vosk model,
+      # and downloading it on every run would burn the repo's LFS bandwidth quota.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22 # vite 8 needs Node 20.19+ or 22.12+
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      # Lint results don't depend on the OS, so only run it once.
+      - run: npm run lint
+        if: matrix.os == 'ubuntu-latest'
+
+      - run: npm run build
+
+  rust:
+    name: Rust ${{ matrix.crate }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        crate: [scraper, server]
+    defaults:
+      run:
+        working-directory: ${{ matrix.crate }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # edition = "2024" needs Rust 1.85+, which current stable satisfies.
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Caches ~/.cargo and target/ between runs.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ${{ matrix.crate }}
+
+      # --locked fails if Cargo.lock is out of date with Cargo.toml.
+      - run: cargo build --locked
+      - run: cargo test --locked
+
+  # The ONE check to mark as "required" in branch protection / rulesets.
+  # It fails if any job above failed or was cancelled, so the required-check
+  # name stays stable even when the OS/crate matrix above changes.
+  gate:
+    name: Gate
+    if: always()
+    needs: [frontend, rust]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

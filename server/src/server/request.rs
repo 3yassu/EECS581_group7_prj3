@@ -18,7 +18,7 @@ pub struct Request {
 impl Request {
 
 	pub fn build_path(s: &str) -> Result<PathBuf> {
-    	let mut path = PathBuf::from("../frontend/dist/");
+    let mut path = PathBuf::from("../frontend/dist/");
 		let req_path = s.trim_start_matches('/');
 		if req_path.is_empty() {
 			path.push("index.html")
