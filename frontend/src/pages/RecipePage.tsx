@@ -9,9 +9,20 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
   const { stepIndex, step, total, isFirst, isLast, nextStep, previousStep } =
     useRecipeSteps(recipe)
   const [lastAction, setLastAction] = useState<string | null>(null)
+  const [ingredientsOpen, setIngredientsOpen] = useState(true)
 
   function repeatCurrentStep() {
     setLastAction(`repeatStep() called - "${step?.text ?? 'No steps available'}"`)
+  }
+
+  function showIngredients() {
+    setIngredientsOpen(true)
+    setLastAction('Ingredients shown')
+  }
+
+  function closeIngredients() {
+    setIngredientsOpen(false)
+    setLastAction('Ingredients hidden')
   }
 
   function startTimer() {
@@ -26,6 +37,8 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
     next: nextStep,
     back: previousStep,
     repeat: repeatCurrentStep,
+    'show ingredients': showIngredients,
+    'close ingredients': closeIngredients,
     'start timer': startTimer,
     'stop timer': stopTimer,
   }
@@ -47,15 +60,30 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
         <h2 className="text-xl font-semibold">Voice controls</h2>
         <p aria-live="polite" className="mt-2">{voiceMessage}</p>
         <p className="mt-1 text-sm text-slate-600">
-          Commands: "next," "back," "repeat," "start timer," or "stop timer."
+          Commands: "next," "back," "repeat," "show ingredients," "close ingredients,"
+          "start timer," or "stop timer."
         </p>
         {lastAction && <p aria-live="polite" className="mt-2 text-sm">{lastAction}</p>}
       </section>
 
-      <h2 className="text-xl font-semibold">Ingredients</h2>
-      <ul className="list-disc pl-6">
-        {recipe.ingredients.map((ing, i) => <li key={i}>{formatIngredient(ing)}</li>)}
-      </ul>
+      <section aria-label="Ingredients" className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">Ingredients</h2>
+          <button
+            type="button"
+            onClick={ingredientsOpen ? closeIngredients : showIngredients}
+            aria-expanded={ingredientsOpen}
+            className="rounded-lg border border-slate-300 px-4 py-2"
+          >
+            {ingredientsOpen ? 'Hide ingredients' : 'Show ingredients'}
+          </button>
+        </div>
+        {ingredientsOpen && (
+          <ul className="list-disc pl-6">
+            {recipe.ingredients.map((ing, i) => <li key={i}>{formatIngredient(ing)}</li>)}
+          </ul>
+        )}
+      </section>
 
       {step ? (
         <section className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4">
