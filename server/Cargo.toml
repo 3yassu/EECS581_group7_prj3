@@ -9,3 +9,5 @@ path = "src/main.rs"
 
 [dependencies]
 heychef_scraper = { path = "../scraper" }
+smol = "2.0.2"
+#async-runtime = { path = "../runtime" }
