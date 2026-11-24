@@ -10,15 +10,19 @@ export function parseHttpUrl(text: string): URL | null {
   }
 }
 
-// FAKE FAKE FAKE REMOVE THIS LATER FAKE FAKE FAKE
-export function importRecipe(url: string): SavedRecipe {
-  const host = new URL(url).hostname
-  return addRecipe({
-    title: `Imported from ${host}`,
-    sourceUrl: url,
-    ingredients: [{ quantity: 'fakefake ', unit: 'fake', name: '(fake ingredient)' }],
-    steps: [{ text: '(fake step 1)' }, { text: '(fake step 2)' }],
-  })
+export async function importRecipe(url: string): Promise<SavedRecipe> {
+  const response = await fetch(`/api/import?url=${encodeURIComponent(url)}`)
+  if (!response.ok) {
+    throw new Error(`Import failed: ${response.statusText}`)
+  }
+
+  const json: unknown = await response.json()
+  const recipe = recipeFromScraped(json, url)
+  if (!recipe) {
+    throw new Error('The backend returned an invalid recipe')
+  }
+
+  return addRecipe(recipe)
 }
 
 //assuming this is how scraper is formatted

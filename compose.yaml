@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      WEBDRIVER_URL: http://selenium:4444
+    depends_on:
+      - selenium
+
+  selenium:
+    image: selenium/standalone-chromium:latest
+    shm_size: 2gb

@@ -19,9 +19,8 @@ type BStr = Box<str>;
 
 // take in &str for address or search for open adddresses?
 pub async fn init_server() -> Result<()>{
-	//let ipv4 = we can decide when we set up the server online;
-	// Alternatively use port 0 to choose a random one
-	let socket = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8080);
+	// listen on all IPv4 interfaces so Docker can forward connections to the server
+	let socket = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 8080);
 	let listener = TcpListener::bind(socket)?;
 	//println!("PORT: {}", listener.local_addr()?.port());
 	for stream in listener.incoming() {

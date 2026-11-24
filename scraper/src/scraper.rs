@@ -2,25 +2,9 @@ use thirtyfour::prelude::*;
 use thirtyfour::ChromeCapabilities;
 use serde::Serialize;
 use std::fmt;
-use std::process::{Child, Command};
 use std::time::Duration;
-use std::path::Path;
 
 use crate::tags::{tags, SiteTags};
-
-struct ChromeDriverGuard(Child);
-
-impl Drop for ChromeDriverGuard {
-    fn drop(&mut self) {
-        // Log failed kills/waits so leaked chromedriver process isn't silent.
-        if let Err(err) = self.0.kill() {
-            eprintln!("failed to kill chromedriver process: {err}");
-        }
-        if let Err(err) = self.0.wait() {
-            eprintln!("failed to reap chromedriver process: {err}");
-        }
-    }
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,7 +42,6 @@ pub enum ScraperError {
     WebDriver(WebDriverError),
     Runtime(std::io::Error),
     Json(serde_json::Error),
-    DriverVersion(String),
     UnsupportedSite(String),
 }
 
@@ -68,7 +51,6 @@ impl fmt::Display for ScraperError {
             ScraperError::WebDriver(err) => write!(f, "webdriver error: {err}"),
             ScraperError::Runtime(err) => write!(f, "tokio runtime error: {err}"),
             ScraperError::Json(err) => write!(f, "json error: {err}"),
-            ScraperError::DriverVersion(err) => write!(f, "driver version error: {err}"),
             ScraperError::UnsupportedSite(url) => write!(f, "no tags configured for site: {url}"),
         }
     }
@@ -90,41 +72,18 @@ impl From<serde_json::Error> for ScraperError {
 
 pub type Result<T> = std::result::Result<T, ScraperError>;
 
-#[cfg(target_os = "windows")]
-const fn driver_filename() -> &'static str { "windows-chromedriver.exe" }
-
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-const fn driver_filename() -> &'static str { "mac-arm64-chromedriver" }
-
-#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-const fn driver_filename() -> &'static str { "mac-x64-chromedriver" }
-
-#[cfg(target_os = "linux")]
-const fn driver_filename() -> &'static str { "linux-chromedriver" }
-
-#[cfg(not(any( target_os = "linux", target_os = "macos", target_os = "windows")))]
-compile_error!("Web scraper only supports MacOS, Linux, & Windows!");
-
-
 // Owns its own tokio runtime so callers don't need one; returns the scraped recipe as a JSON string.
 pub fn run() -> Result<String> {
-    let driver_version = driver_filename();
-
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .map_err(ScraperError::Runtime)?;
-    runtime.block_on(run_async(driver_version))
+    runtime.block_on(run_async())
 }
 
-async fn run_async(driver_version: &str) -> Result<String> {
-    let driver_path = Path::new("./webdrivers").join(driver_version);
-    let _chromedriver = ChromeDriverGuard(
-        Command::new(&driver_path)
-            .arg("--port=9515")
-            .spawn()
-            .unwrap_or_else(|_| panic!("Failed to start chromedriver at {}", driver_path.display())),
-    );
+async fn run_async() -> Result<String> {
+    let webdriver_url = std::env::var("WEBDRIVER_URL")
+        .unwrap_or_else(|_| "http://localhost:4444".to_string());
 
     let mut caps = DesiredCapabilities::chrome();
     caps.add_chrome_arg("--headless=new")?;
@@ -133,8 +92,8 @@ async fn run_async(driver_version: &str) -> Result<String> {
     caps.add_chrome_arg("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")?;
     caps.add_chrome_option("excludeSwitches", ["enable-automation"])?;
 
-    let driver = connect_with_retry("http://localhost:9515", caps).await?;
-
+    let driver = connect_with_retry(&webdriver_url, caps).await?;
+    
     driver.maximize_window().await?;
 
     let scrape_result = scrape(&driver, "https://www.allrecipes.com/savory-dutch-baby-recipe-12148516").await;
@@ -147,7 +106,7 @@ async fn run_async(driver_version: &str) -> Result<String> {
 
 async fn connect_with_retry(url: &str, caps: ChromeCapabilities) -> WebDriverResult<WebDriver> {
     let mut last_err = None;
-    for _ in 0..20 {
+    for _ in 0..60 {
         match WebDriver::new(url, caps.clone()).await {
             Ok(driver) => return Ok(driver),
             Err(error) => {
