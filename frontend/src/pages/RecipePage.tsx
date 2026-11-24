@@ -75,7 +75,7 @@ function RecipeView({ recipe }: { recipe: Recipe }) {
             aria-expanded={ingredientsOpen}
             className="rounded-lg border border-slate-300 px-4 py-2"
           >
-            {ingredientsOpen ? 'Hide ingredients' : 'Show ingredients'}
+            {ingredientsOpen ? 'Close ingredients' : 'Show ingredients'}
           </button>
         </div>
         {ingredientsOpen && (
