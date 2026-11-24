@@ -93,6 +93,7 @@ async fn run_async() -> Result<String> {
     caps.add_chrome_option("excludeSwitches", ["enable-automation"])?;
 
     let driver = connect_with_retry(&webdriver_url, caps).await?;
+    println!("connected to Selenium WebDriver");
     
     driver.maximize_window().await?;
 
